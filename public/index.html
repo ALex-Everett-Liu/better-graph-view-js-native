@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Database Interface</title>
+</head>
+<body>
+    <h1>Graph Database Interface</h1>
+    <input type="file" id="fileInput" accept=".json">
+    <button id="importButton">Import Data</button>
+    <div id="importStatus"></div>
+
+    <h2>Find Related Chunks</h2>
+    <form id="relatedChunksForm">
+        <input type="text" id="chunkInput" placeholder="Enter a chunk" required>
+        <button type="submit">Find Related Chunks</button>
+    </form>
+    <div id="relatedChunksResults"></div>
+
+    <h2>Keyword Search</h2>
+    <form id="searchForm">
+        <input type="text" id="keywordInput" placeholder="Enter a keyword" required>
+        <button type="submit">Search</button>
+    </form>
+    <div id="searchResults"></div>
+
+    <script>
+        let isDataImported = false;
+
+        document.getElementById('importButton').addEventListener('click', async () => {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const data = JSON.parse(e.target.result);
+                    const response = await fetch('/import-data', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data),
+                    });
+                    const result = await response.json();
+                    document.getElementById('importStatus').textContent = result.message;
+                    isDataImported = true;
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('relatedChunksForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!isDataImported) {
+                alert('Please import data first');
+                return;
+            }
+            const chunk = document.getElementById('chunkInput').value;
+            const response = await fetch('/related-chunks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ chunk }),
+            });
+            const data = await response.json();
+            const resultsDiv = document.getElementById('relatedChunksResults');
+            resultsDiv.innerHTML = '<h3>Related Chunks:</h3>';
+            resultsDiv.innerHTML += data.map(chunk => `<p>${chunk.name} (Weight: ${chunk.weight})</p>`).join('');
+        });
+
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!isDataImported) {
+                alert('Please import data first');
+                return;
+            }
+            const keyword = document.getElementById('keywordInput').value;
+            const response = await fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ keyword }),
+            });
+            const data = await response.json();
+            const resultsDiv = document.getElementById('searchResults');
+            resultsDiv.innerHTML = '<h3>Search Results:</h3>';
+            resultsDiv.innerHTML += data.map(chunk => `<p>${chunk}</p>`).join('');
+        });
+    </script>
+</body>
+</html>
