@@ -20,7 +20,12 @@ app.post('/related-chunks', (req, res) => {
     }
 
     const { chunk } = req.body;
-    const relatedChunks = graphData[chunk] || [];
+    const relatedChunks = graphData
+        .filter(edge => edge.source === chunk || edge.target === chunk)
+        .map(edge => ({
+            name: edge.source === chunk ? edge.target : edge.source,
+            weight: edge.weight
+        }));
     res.json(relatedChunks);
 });
 
@@ -30,8 +35,16 @@ app.post('/search', (req, res) => {
     }
 
     const { keyword } = req.body;
-    const results = Object.keys(graphData).filter(chunk => chunk.toLowerCase().includes(keyword.toLowerCase()));
-    res.json(results);
+    const results = new Set();
+    graphData.forEach(edge => {
+        if (edge.source.toLowerCase().includes(keyword.toLowerCase())) {
+            results.add(edge.source);
+        }
+        if (edge.target.toLowerCase().includes(keyword.toLowerCase())) {
+            results.add(edge.target);
+        }
+    });
+    res.json(Array.from(results));
 });
 
 app.get('*', (req, res) => {
