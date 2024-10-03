@@ -9,24 +9,61 @@ app.use(express.static('public'));
 
 let graphData = null;
 
+function getRelatedChunks(startChunk, maxDepth = 3) {
+    return new Promise((resolve) => {
+        const related = new Map();
+        const queue = [[startChunk, 0]];
+        const visited = new Set();
+
+        function processDepth(depth) {
+            if (depth >= maxDepth || queue.length === 0) {
+                resolve(related);
+                return;
+            }
+
+            const newQueue = [];
+
+            queue.forEach(([current, currentWeight]) => {
+                if (current !== startChunk) {
+                    related.set(current, Math.max(related.get(current) || 0, currentWeight));
+                }
+
+                graphData.forEach(edge => {
+                    if (edge.source === current && !visited.has(edge.target)) {
+                        newQueue.push([edge.target, edge.weight]);
+                        visited.add(edge.target);
+                    }
+                });
+            });
+
+            queue.length = 0;
+            queue.push(...newQueue);
+            processDepth(depth + 1);
+        }
+
+        processDepth(0);
+    });
+}
+
+function sortRelatedChunks(related) {
+    return Array.from(related.entries())
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
 app.post('/import-data', (req, res) => {
     graphData = req.body;
     res.json({ message: 'Data imported successfully' });
 });
 
-app.post('/related-chunks', (req, res) => {
+app.post('/related-chunks', async (req, res) => {
     if (!graphData) {
         return res.status(400).json({ error: 'No graph data imported' });
     }
 
-    const { chunk } = req.body;
-    const relatedChunks = graphData
-        .filter(edge => edge.source === chunk || edge.target === chunk)
-        .map(edge => ({
-            name: edge.source === chunk ? edge.target : edge.source,
-            weight: edge.weight
-        }));
-    res.json(relatedChunks);
+    const { chunk, maxDepth } = req.body;
+    const related = await getRelatedChunks(chunk, maxDepth);
+    const sortedRelated = sortRelatedChunks(related);
+    res.json(sortedRelated.map(([name, weight]) => ({ name, weight })));
 });
 
 app.post('/search', (req, res) => {
